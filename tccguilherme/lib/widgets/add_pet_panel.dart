@@ -29,6 +29,10 @@ class _AddPetPanelState extends State<AddPetPanel> {
   LatLng? _selectedLocation;
   bool _useCurrentLocation = false;
   bool _isLoading = false;
+  String? _selectedSize;
+  final List<String> _selectedColors = [];
+  final List<String> _colors = ['Preto', 'Branco', 'Marrom', 'Cinza', 'Laranja', 'Dourado', 'Creme'];
+
 
   @override
   void dispose() {
@@ -140,6 +144,7 @@ class _AddPetPanelState extends State<AddPetPanel> {
     // Verifica se serviço de localização está ativo
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Serviços de localização estão desabilitados.'),
@@ -154,6 +159,7 @@ class _AddPetPanelState extends State<AddPetPanel> {
       // Solicita permissão se negada
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
+        if (!mounted) return null;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Permissões de localização negadas.')),
         );
@@ -163,6 +169,7 @@ class _AddPetPanelState extends State<AddPetPanel> {
 
     // Trata caso de negação permanente
     if (permission == LocationPermission.deniedForever) {
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -184,10 +191,14 @@ class _AddPetPanelState extends State<AddPetPanel> {
   /// Eu também controlo o estado de `_isLoading` para mostrar um indicador de
   /// progresso e trato as respostas de sucesso e erro do servidor.
   Future<void> _submit() async {
-    if (_image == null || _selectedLocation == null) {
+    if (_image == null ||
+        _selectedLocation == null ||
+        _selectedSize == null ||
+        _selectedColors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('A imagem e a localização são obrigatórias.'),
+          content: Text(
+              'Todos os campos são obrigatórios, incluindo a imagem, localização, tamanho e pelo menos uma cor.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -205,9 +216,8 @@ class _AddPetPanelState extends State<AddPetPanel> {
       }
       final token = await user.getIdToken();
 
-      final petName = _nameController.text.isEmpty
-          ? 'Não informado'
-          : _nameController.text;
+      final petName =
+          _nameController.text.isEmpty ? 'Não informado' : _nameController.text;
       final status = _isFound ? 'encontrado' : 'perdido';
       final locationData = {
         'latitude': _selectedLocation!.latitude,
@@ -216,18 +226,18 @@ class _AddPetPanelState extends State<AddPetPanel> {
 
       final uri = Uri.parse('${getBaseUrl()}/api/pets');
       final request = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] =
-            'Bearer $token' // Token de autenticação
+        ..headers['Authorization'] = 'Bearer $token'
         ..fields['name'] = petName
         ..fields['description'] = _descriptionController.text
         ..fields['status'] = status
-        ..fields['location'] = json
-            .encode(locationData) // Localização como JSON string
+        ..fields['size'] = _selectedSize!
+        ..fields['colors'] = json.encode(_selectedColors)
+        ..fields['location'] = json.encode(locationData)
         ..files.add(
           await http.MultipartFile.fromPath('image', _image!.path),
-        ); // Arquivo da imagem
+        );
 
-      final response = await request.send(); // Envia a requisição
+      final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
       if (!mounted) return;
@@ -242,8 +252,7 @@ class _AddPetPanelState extends State<AddPetPanel> {
         Navigator.of(context).pop();
       } else if (response.statusCode == 400) {
         final decodedBody = json.decode(responseBody);
-        final errorMessage =
-            decodedBody['error'] ??
+        final errorMessage = decodedBody['error'] ??
             'A imagem enviada não parece ser de um animal.';
 
         if (!mounted) return;
@@ -281,6 +290,89 @@ class _AddPetPanelState extends State<AddPetPanel> {
         });
       }
     }
+  }
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Selecione as Cores'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _colors.map((color) {
+                    return CheckboxListTile(
+                      title: Text(color),
+                      value: _selectedColors.contains(color),
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            if (!_selectedColors.contains(color)) {
+                              _selectedColors.add(color);
+                            }
+                          } else {
+                            _selectedColors.remove(color);
+                          }
+                        });
+                        // Also call the parent setState to rebuild the widget showing the selected colors
+                        this.setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('FECHAR'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildColorSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Cor(es) do animal:',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _showColorPicker,
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            ),
+            child: Wrap(
+              spacing: 6.0,
+              runSpacing: 6.0,
+              children: _selectedColors.isNotEmpty
+                  ? _selectedColors
+                      .map((color) => Chip(
+                            label: Text(color),
+                            onDeleted: () {
+                              setState(() {
+                                _selectedColors.remove(color);
+                              });
+                            },
+                          ))
+                      .toList()
+                  : [const Text('Selecione as cores')],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -350,14 +442,14 @@ class _AddPetPanelState extends State<AddPetPanel> {
                             boxShadow: !_isFound
                                 ? [
                                     BoxShadow(
-                                      color: Colors.grey.withOpacity(0.3),
+                                      color: Colors.grey.withAlpha((255 * 0.3).round()),
                                       spreadRadius: 1,
                                       blurRadius: 5,
                                     ),
                                   ]
                                 : [],
                           ),
-                          child: Text(
+                          child: const Text(
                             'Perdi',
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -459,7 +551,7 @@ class _AddPetPanelState extends State<AddPetPanel> {
                                 ),
                               )
                             : ElevatedButton.icon(
-                                icon: Icon(
+                                icon: const Icon(
                                   Icons.check_circle,
                                   color: Colors.white,
                                 ),
@@ -481,6 +573,10 @@ class _AddPetPanelState extends State<AddPetPanel> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildSizeSelector(),
+              const SizedBox(height: 16),
+              _buildColorSelector(),
               const SizedBox(height: 16),
               const Text(
                 'Descrição:',
@@ -506,6 +602,45 @@ class _AddPetPanelState extends State<AddPetPanel> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSizeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Tamanho do animal:',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedSize,
+          hint: const Text('Selecione o tamanho'),
+          onChanged: (value) {
+            setState(() {
+              _selectedSize = value;
+            });
+          },
+          items: const [
+            DropdownMenuItem(
+              value: 'Pequeno',
+              child: Text('Pequeno (até 10kg)'),
+            ),
+            DropdownMenuItem(
+              value: 'Médio',
+              child: Text('Médio (até 20kg)'),
+            ),
+            DropdownMenuItem(
+              value: 'Grande',
+              child: Text('Grande (mais de 20kg)'),
+            ),
+          ],
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
     );
   }
 }

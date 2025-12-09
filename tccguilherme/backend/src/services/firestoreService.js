@@ -67,7 +67,7 @@ const savePet = async (petData) => {
 /// depois adiciono o filtro de status se ele for fornecido, e por fim o filtro de características
 /// (usando 'array-contains-any').
 /// A função retorna uma lista com os pets que correspondem aos filtros.
-const getPets = async (status, characteristics) => {
+const getPets = async (status, characteristics, animalType, size, colors) => {
     try {
         let query = db.collection('pets').orderBy('createdAt', 'desc');
 
@@ -75,11 +75,27 @@ const getPets = async (status, characteristics) => {
             query = query.where('status', '==', status);
         }
 
+        if (animalType) {
+            query = query.where('animalType', '==', animalType);
+        }
+
+        if (size) {
+            query = query.where('size', '==', size);
+        }
+
         // Filtro por características
         if (characteristics) {
             const characteristicsArray = characteristics.split(',');
             if (characteristicsArray.length > 0) {
                 query = query.where('characteristics', 'array-contains-any', characteristicsArray);
+            }
+        }
+
+        // Filtro por cores
+        if (colors) {
+            const colorsArray = colors.split(',');
+            if (colorsArray.length > 0) {
+                query = query.where('colors', 'array-contains-any', colorsArray);
             }
         }
 

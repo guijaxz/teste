@@ -27,6 +27,10 @@ class _LostScreenState extends State<LostScreen> {
   late Future<List<Pet>> _lostPetsFuture;
   final String? _currentUserId = FirebaseAuth.instance.currentUser?.uid;
   List<String> _activeFilters = []; // Lista de filtros ativos
+  String? _selectedAnimalType; // Filtro para tipo de animal
+  String? _selectedSize; // Filtro para tamanho do animal
+  List<String> _selectedColors = [];
+  final List<String> _colors = ['Preto', 'Branco', 'Marrom', 'Cinza', 'Laranja', 'Dourado', 'Creme'];
 
   @override
   void initState() {
@@ -45,9 +49,218 @@ class _LostScreenState extends State<LostScreen> {
   /// API no endpoint `/filter-by-image`. A API me retorna uma lista de
   /// características (ex: 'Golden Retriever', 'Branco'). Eu armazeno essas
   /// características no estado `_activeFilters` e recarrego a lista de pets.
+  Future<void> _showFilterOptions() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.image_search),
+            title: const Text('Filtrar por imagem'),
+            onTap: () {
+              Navigator.pop(context);
+              _filterByImage();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.pets),
+            title: const Text('Filtrar por tipo de animal'),
+            onTap: () {
+              Navigator.pop(context);
+              _showAnimalTypeFilter();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.straighten),
+            title: const Text('Filtrar por tamanho'),
+            onTap: () {
+              Navigator.pop(context);
+              _showSizeFilter();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.color_lens),
+            title: const Text('Filtrar por cor'),
+            onTap: () {
+              Navigator.pop(context);
+              _showColorFilter();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showColorFilter() async {
+    // Usa uma cópia temporária para que o usuário possa cancelar as alterações.
+    List<String> tempSelectedColors = List<String>.from(_selectedColors);
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Selecione as Cores'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _colors.map((color) {
+                    return CheckboxListTile(
+                      title: Text(color),
+                      value: tempSelectedColors.contains(color),
+                      onChanged: (bool? selected) {
+                        setState(() {
+                          if (selected == true) {
+                            tempSelectedColors.add(color);
+                          } else {
+                            tempSelectedColors.remove(color);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Aplicar'),
+              onPressed: () {
+                // Aplica os filtros selecionados ao estado principal.
+                this.setState(() {
+                  _selectedColors = tempSelectedColors;
+                  if (_selectedColors.isNotEmpty) {
+                    // Limpa outros filtros para focar na cor.
+                    _activeFilters.clear();
+                    _selectedAnimalType = null;
+                    _selectedSize = null;
+                  }
+                });
+                // Recarrega a lista de pets com o novo filtro.
+                _loadLostPets();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showAnimalTypeFilter() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            title: const Text('Todos'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = null;
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Cachorro'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = 'Dog';
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Gato'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = 'Cat';
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSizeFilter() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            title: const Text('Todos'),
+            onTap: () {
+              setState(() {
+                _selectedSize = null;
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Pequeno (até 10kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Pequeno';
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Médio (até 20kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Médio';
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Grande (mais de 20kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Grande';
+                _activeFilters.clear();
+              });
+              _loadLostPets();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Este método implementa a lógica de "filtrar por imagem".
+  /// Eu primeiro peço ao usuário para escolher uma imagem, depois a envio para a
+  /// API no endpoint `/filter-by-image`. A API me retorna uma lista de
+  /// características (ex: 'Golden Retriever', 'Branco'). Eu armazeno essas
+  /// características no estado `_activeFilters` e recarrego a lista de pets.
   Future<void> _filterByImage() async {
     final imageFile = await _pickImage();
     if (imageFile == null) return;
+    if (!mounted) return;
 
     // Exibe um indicador de carregamento
     ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +288,8 @@ class _LostScreenState extends State<LostScreen> {
 
         setState(() {
           _activeFilters = characteristics;
+          _selectedAnimalType = null; // Limpa o filtro de tipo de animal
+          _selectedSize = null; // Limpa o filtro de tamanho
         });
         _loadLostPets(); // Recarrega a lista com os filtros
 
@@ -164,6 +379,12 @@ class _LostScreenState extends State<LostScreen> {
       'status': 'perdido',
       if (_activeFilters.isNotEmpty)
         'characteristics': _activeFilters.join(','),
+      if (_selectedAnimalType != null)
+        'animalType': _selectedAnimalType!,
+      if (_selectedSize != null)
+        'size': _selectedSize!,
+      if (_selectedColors.isNotEmpty)
+        'colors': _selectedColors.join(','),
     };
     final url = Uri.parse(
       '${getBaseUrl()}/api/pets',
@@ -193,6 +414,7 @@ class _LostScreenState extends State<LostScreen> {
   Future<void> _notifyOwner(String petId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Você precisa estar logado para realizar esta ação.'),
@@ -226,6 +448,7 @@ class _LostScreenState extends State<LostScreen> {
     );
 
     if (confirmed == null || !confirmed) return;
+    if (!mounted) return;
 
     try {
       final token = await user.getIdToken();
@@ -290,12 +513,18 @@ class _LostScreenState extends State<LostScreen> {
                   ),
                   Row(
                     children: [
-                      if (_activeFilters.isNotEmpty)
+                      if (_activeFilters.isNotEmpty ||
+                          _selectedAnimalType != null ||
+                          _selectedSize != null ||
+                          _selectedColors.isNotEmpty)
                         TextButton(
                           child: const Text('Limpar'),
                           onPressed: () {
                             setState(() {
                               _activeFilters.clear();
+                              _selectedAnimalType = null;
+                              _selectedSize = null;
+                              _selectedColors.clear();
                             });
                             _loadLostPets();
                           },
@@ -305,7 +534,7 @@ class _LostScreenState extends State<LostScreen> {
                           Icons.filter_alt_outlined,
                           color: Colors.black,
                         ),
-                        onPressed: _filterByImage,
+                        onPressed: _showFilterOptions,
                       ),
                     ],
                   ),
@@ -496,6 +725,46 @@ class _LostScreenState extends State<LostScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (pet.size != null && pet.size!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Tamanho: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.size!,
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (pet.colors.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Cor: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.colors.join(', '),
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Text(
                   'Descrição:',
                   style: TextStyle(

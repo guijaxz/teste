@@ -347,6 +347,46 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (pet.size != null && pet.size!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Tamanho: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.size!,
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (pet.colors.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Cor: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.colors.join(', '),
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Text(
                   'Descrição:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

@@ -28,6 +28,10 @@ class _FoundScreenState extends State<FoundScreen> {
   late Future<List<Pet>> _foundPetsFuture;
   final String? _currentUserId = FirebaseAuth.instance.currentUser?.uid;
   List<String> _activeFilters = []; // Lista de filtros ativos
+  String? _selectedAnimalType; // Filtro para tipo de animal
+  String? _selectedSize; // Filtro para tamanho do animal
+  List<String> _selectedColors = [];
+  final List<String> _colors = ['Preto', 'Branco', 'Marrom', 'Cinza', 'Laranja', 'Dourado', 'Creme'];
 
   @override
   void initState() {
@@ -41,10 +45,214 @@ class _FoundScreenState extends State<FoundScreen> {
     });
   }
 
+  Future<void> _showFilterOptions() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.image_search),
+            title: const Text('Filtrar por imagem'),
+            onTap: () {
+              Navigator.pop(context);
+              _filterByImage();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.pets),
+            title: const Text('Filtrar por tipo de animal'),
+            onTap: () {
+              Navigator.pop(context);
+              _showAnimalTypeFilter();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.straighten),
+            title: const Text('Filtrar por tamanho'),
+            onTap: () {
+              Navigator.pop(context);
+              _showSizeFilter();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.color_lens),
+            title: const Text('Filtrar por cor'),
+            onTap: () {
+              Navigator.pop(context);
+              _showColorFilter();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showColorFilter() async {
+    // Usa uma cópia temporária para que o usuário possa cancelar as alterações.
+    List<String> tempSelectedColors = List<String>.from(_selectedColors);
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Selecione as Cores'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _colors.map((color) {
+                    return CheckboxListTile(
+                      title: Text(color),
+                      value: tempSelectedColors.contains(color),
+                      onChanged: (bool? selected) {
+                        setState(() {
+                          if (selected == true) {
+                            tempSelectedColors.add(color);
+                          } else {
+                            tempSelectedColors.remove(color);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Aplicar'),
+              onPressed: () {
+                // Aplica os filtros selecionados ao estado principal.
+                this.setState(() {
+                  _selectedColors = tempSelectedColors;
+                  if (_selectedColors.isNotEmpty) {
+                    // Limpa outros filtros para focar na cor.
+                    _activeFilters.clear();
+                    _selectedAnimalType = null;
+                    _selectedSize = null;
+                  }
+                });
+                // Recarrega a lista de pets com o novo filtro.
+                _loadFoundPets();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showAnimalTypeFilter() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            title: const Text('Todos'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = null;
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Cachorro'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = 'Dog';
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Gato'),
+            onTap: () {
+              setState(() {
+                _selectedAnimalType = 'Cat';
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSizeFilter() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            title: const Text('Todos'),
+            onTap: () {
+              setState(() {
+                _selectedSize = null;
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Pequeno (até 10kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Pequeno';
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Médio (até 20kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Médio';
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Grande (mais de 20kg)'),
+            onTap: () {
+              setState(() {
+                _selectedSize = 'Grande';
+                _activeFilters.clear();
+              });
+              _loadFoundPets();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- Lógica de Filtro por Imagem ---
   Future<void> _filterByImage() async {
     final imageFile = await _pickImage();
     if (imageFile == null) return;
+    if (!mounted) return;
 
     // Exibe um indicador de carregamento
     ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +280,8 @@ class _FoundScreenState extends State<FoundScreen> {
 
         setState(() {
           _activeFilters = characteristics;
+          _selectedAnimalType = null; // Limpa o filtro de tipo de animal
+          _selectedSize = null; // Limpa o filtro de tamanho
         });
         _loadFoundPets(); // Recarrega a lista com os filtros
 
@@ -159,6 +369,12 @@ class _FoundScreenState extends State<FoundScreen> {
       'status': 'encontrado',
       if (_activeFilters.isNotEmpty)
         'characteristics': _activeFilters.join(','),
+      if (_selectedAnimalType != null)
+        'animalType': _selectedAnimalType!,
+      if (_selectedSize != null)
+        'size': _selectedSize!,
+      if (_selectedColors.isNotEmpty)
+        'colors': _selectedColors.join(','),
     };
     final url = Uri.parse(
       '${getBaseUrl()}/api/pets',
@@ -188,6 +404,7 @@ class _FoundScreenState extends State<FoundScreen> {
   Future<void> _notifyFinder(String petId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Você precisa estar logado para realizar esta ação.'),
@@ -221,6 +438,7 @@ class _FoundScreenState extends State<FoundScreen> {
     );
 
     if (confirmed == null || !confirmed) return;
+    if (!mounted) return;
 
     try {
       final token = await user.getIdToken();
@@ -288,12 +506,18 @@ class _FoundScreenState extends State<FoundScreen> {
                   ),
                   Row(
                     children: [
-                      if (_activeFilters.isNotEmpty)
+                      if (_activeFilters.isNotEmpty ||
+                          _selectedAnimalType != null ||
+                          _selectedSize != null ||
+                          _selectedColors.isNotEmpty)
                         TextButton(
                           child: const Text('Limpar'),
                           onPressed: () {
                             setState(() {
                               _activeFilters.clear();
+                              _selectedAnimalType = null;
+                              _selectedSize = null;
+                              _selectedColors.clear();
                             });
                             _loadFoundPets();
                           },
@@ -303,7 +527,7 @@ class _FoundScreenState extends State<FoundScreen> {
                           Icons.filter_alt_outlined,
                           color: Colors.black,
                         ),
-                        onPressed: _filterByImage,
+                        onPressed: _showFilterOptions,
                       ),
                     ],
                   ),
@@ -491,6 +715,46 @@ class _FoundScreenState extends State<FoundScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (pet.size != null && pet.size!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Tamanho: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.size!,
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (pet.colors.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Cor: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[850],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          pet.colors.join(', '),
+                          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Text(
                   'Descrição:',
                   style: TextStyle(

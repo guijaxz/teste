@@ -29,6 +29,9 @@ class Pet {
   final PetLocation location;
   final DateTime createdAt;
   final String? ownerName;
+  final String? animalType;
+  final String? size;
+  final List<String> colors;
 
   Pet({
     required this.id,
@@ -40,6 +43,9 @@ class Pet {
     required this.location,
     required this.createdAt,
     this.ownerName,
+    this.animalType,
+    this.size,
+    required this.colors,
   });
 
   /// Este construtor factory converte os dados JSON da minha API em um objeto `Pet`.
@@ -70,6 +76,9 @@ class Pet {
       location: PetLocation.fromJson(json['location']),
       createdAt: createdAt,
       ownerName: json['ownerName'],
+      animalType: json['animalType'],
+      size: json['size'],
+      colors: json['colors'] != null ? List<String>.from(json['colors']) : [],
     );
   }
 }

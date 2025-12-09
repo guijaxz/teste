@@ -4,7 +4,7 @@ const multer = require('multer');
 const admin = require('firebase-admin'); 
 const { uploadImage } = require('../services/firebaseStorageService');
 const { savePet, getPets, deletePet } = require('../services/firestoreService');
-const { analyzeAndSearchImage, validateImageIsPet, getPetCharacteristics } = require('../services/rekognitionService'); 
+const { analyzeAndSearchImage, validateImageIsPet, getPetCharacteristics, getAnimalType } = require('../services/rekognitionService'); 
 const { notifyPetOwner } = require('../services/notificationService');
 const { isLocationInAllowedArea } = require('../utils/location');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -35,12 +35,13 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
             return res.status(400).json({ error: 'A imagem é obrigatória.' });
         }
 
-        const { name, description, status, location } = req.body;
+        const { name, description, status, location, size, colors } = req.body;
         if (!status) {
             return res.status(400).json({ error: 'O status (perdido/encontrado) é obrigatório.' });
         }
 
         const parsedLocation = location ? JSON.parse(location) : null;
+        const parsedColors = colors ? JSON.parse(colors) : [];
 
         // Validar se a localização está na área permitida
         if (parsedLocation && !isLocationInAllowedArea(parsedLocation.latitude, parsedLocation.longitude)) {
@@ -60,8 +61,11 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
         // 2. Upload da imagem para o Firebase Storage
         const imageUrl = await uploadImage(req.file, userId);
 
-        // Extrai características da imagem
-        const characteristics = await getPetCharacteristics(req.file.buffer);
+        // Extrai características e o tipo do animal da imagem
+        const [characteristics, animalType] = await Promise.all([
+            getPetCharacteristics(req.file.buffer),
+            getAnimalType(req.file.buffer)
+        ]);
 
         // Prepara os dados do pet para salvar
         const petData = {
@@ -73,7 +77,10 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
             location: parsedLocation, // { latitude: XXX, longitude: YYY }
             imageUrl,
             faceId: null, // Será preenchido após a análise do Rekognition
-            characteristics // Salva as características no banco
+            characteristics, // Salva as características no banco
+            animalType, // Salva o tipo do animal (Dog/Cat)
+            size, // Salva o tamanho do animal (Pequeno, Médio, Grande)
+            colors: parsedColors
         };
 
         // 3. Salva os dados do pet no Firestore para obter um ID
@@ -91,16 +98,10 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
     }
 });
 
-/// Eu criei esta rota para listar os pets cadastrados.
-/// Ela é pública e pode ser filtrada de duas maneiras, através de query-parameters na URL:
-/// - `status`: para ver apenas pets 'perdidos' ou 'encontrados'.
-/// - `characteristics`: para filtrar por características visuais.
-/// Eu pego esses filtros e os passo para a função `getPets` do `firestoreService`,
-/// que se encarrega de construir a consulta no banco de dados e retornar a lista de pets correspondente.
 router.get('/', async (req, res) => {
     try {
-        const { status, characteristics } = req.query; // Captura status e características da URL
-        const pets = await getPets(status, characteristics); // Chama o serviço Firestore com os filtros
+        const { status, characteristics, animalType, size, colors } = req.query; // Captura status, características, tipo, tamanho e cores do animal da URL
+        const pets = await getPets(status, characteristics, animalType, size, colors); // Chama o serviço Firestore com os filtros
         res.status(200).json(pets);
     } catch (error) {
         res.status(500).json({ error: error.message });

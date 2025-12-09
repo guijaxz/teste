@@ -130,4 +130,33 @@ const getPetCharacteristics = async (imageBuffer) => {
     }
 };
 
-module.exports = { analyzeAndSearchImage, validateImageIsPet, getPetCharacteristics };
+const getAnimalType = async (imageBuffer) => {
+    console.log("Extraindo o tipo do animal...");
+    try {
+        const detectLabelsParams = {
+            Image: { Bytes: imageBuffer },
+            MinConfidence: 90
+        };
+        const labelsResponse = await rekognition.send(new DetectLabelsCommand(detectLabelsParams));
+
+        const dogLabel = labelsResponse.Labels.find(label => label.Name === 'Dog');
+        const catLabel = labelsResponse.Labels.find(label => label.Name === 'Cat');
+
+        if (dogLabel && catLabel) {
+            return dogLabel.Confidence > catLabel.Confidence ? 'Dog' : 'Cat';
+        }
+        if (dogLabel) {
+            return 'Dog';
+        }
+        if (catLabel) {
+            return 'Cat';
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Erro ao extrair o tipo de animal da imagem:", error);
+        return null;
+    }
+};
+
+module.exports = { analyzeAndSearchImage, validateImageIsPet, getPetCharacteristics, getAnimalType };
